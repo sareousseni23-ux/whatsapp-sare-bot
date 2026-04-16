@@ -1,5 +1,7 @@
 """Message routing logic — inspects incoming text and dispatches to skill handlers."""
 
+from calendar_integration import get_upcoming_events
+
 
 def handle_message(text: str) -> str:
     """Route an incoming message to the appropriate skill and return a reply.
@@ -25,7 +27,7 @@ def handle_message(text: str) -> str:
     )
 
 
-# ── keyword matchers ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ── keyword matchers ────────────────────────────────────────────────────────────────────────
 
 FAQ_KEYWORDS = {"faq", "help", "question", "support", "info", "hours", "pricing"}
 CALENDAR_KEYWORDS = {"calendar", "schedule", "meeting", "appointment", "event", "book"}
@@ -44,7 +46,7 @@ def _matches_crm(text: str) -> bool:
     return any(kw in text for kw in CRM_KEYWORDS)
 
 
-# ── skill placeholders ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ── skill placeholders ──────────────────────────────────────────────────────────────────────
 
 def faq_skill(text: str) -> str:
     """Placeholder — look up an answer from the FAQ knowledge base."""
@@ -57,11 +59,37 @@ def faq_skill(text: str) -> str:
 
 
 def calendar_skill(text: str) -> str:
-    """Placeholder — create, list, or modify calendar events."""
+    """Fetch upcoming Google Calendar events and return a formatted reply."""
+    events = get_upcoming_events()
+
+    if not events:
+        return (
+            "📅 *Calendar Skill*\n"
+            f"You asked: _{text}_\n\n"
+            "No upcoming events found for the rest of this week.\n"
+            "Reply with *book <title> <date> <time>* to schedule a new event."
+        )
+
+    lines = []
+    for ev in events:
+        start_raw = ev["start"]
+        try:
+            if "T" in start_raw:
+                dt = start_raw.replace("Z", "+00:00")
+                from datetime import datetime as _dt
+                parsed = _dt.fromisoformat(dt)
+                formatted = parsed.strftime("%a %b %d, %I:%M %p")
+            else:
+                formatted = start_raw
+        except (ValueError, TypeError):
+            formatted = start_raw
+        lines.append(f"• *{ev['title']}* — {formatted}")
+
+    event_list = "\n".join(lines)
     return (
         "📅 *Calendar Skill*\n"
         f"You asked: _{text}_\n\n"
-        "Your next meeting is tomorrow at 10:00 AM with the product team.\n"
+        f"*Upcoming events this week:*\n{event_list}\n\n"
         "Reply with *book <title> <date> <time>* to schedule a new event."
     )
 
