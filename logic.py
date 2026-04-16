@@ -1,6 +1,7 @@
 """Message routing logic — inspects incoming text and dispatches to skill handlers."""
 
 from calendar_integration import get_upcoming_events
+from slack_integration import get_recent_action_items
 
 
 def handle_message(text: str) -> str:
@@ -9,6 +10,7 @@ def handle_message(text: str) -> str:
     Routing rules (checked in order):
         • FAQ keywords  → faq_skill
         • Calendar keywords → calendar_skill
+        • Slack keywords → slack_skill
         • CRM keywords  → crm_skill
         • Anything else → default reply
     """
@@ -18,19 +20,22 @@ def handle_message(text: str) -> str:
         return faq_skill(text)
     if _matches_calendar(normalised):
         return calendar_skill(text)
+    if _matches_slack(normalised):
+        return slack_skill(text)
     if _matches_crm(normalised):
         return crm_skill(text)
 
     return (
         "Sorry, I didn't understand that. "
-        "Try asking about our FAQ, your calendar, or CRM contacts."
+        "Try asking about our FAQ, your calendar, Slack tasks, or CRM contacts."
     )
 
 
-# ── keyword matchers ────────────────────────────────────────────────────────────────────────
+# ── keyword matchers ──────────────────────────────────────────────────────────────────────
 
 FAQ_KEYWORDS = {"faq", "help", "question", "support", "info", "hours", "pricing"}
 CALENDAR_KEYWORDS = {"calendar", "schedule", "meeting", "appointment", "event", "book"}
+SLACK_KEYWORDS = {"slack", "task", "todo", "messaggi"}
 CRM_KEYWORDS = {"crm", "contact", "lead", "customer", "deal", "pipeline", "account"}
 
 
@@ -42,11 +47,15 @@ def _matches_calendar(text: str) -> bool:
     return any(kw in text for kw in CALENDAR_KEYWORDS)
 
 
+def _matches_slack(text: str) -> bool:
+    return any(kw in text for kw in SLACK_KEYWORDS)
+
+
 def _matches_crm(text: str) -> bool:
     return any(kw in text for kw in CRM_KEYWORDS)
 
 
-# ── skill placeholders ──────────────────────────────────────────────────────────────────────
+# ── skill placeholders ────────────────────────────────────────────────────────────────────
 
 def faq_skill(text: str) -> str:
     """Placeholder — look up an answer from the FAQ knowledge base."""
@@ -91,6 +100,36 @@ def calendar_skill(text: str) -> str:
         f"You asked: _{text}_\n\n"
         f"*Upcoming events this week:*\n{event_list}\n\n"
         "Reply with *book <title> <date> <time>* to schedule a new event."
+    )
+
+
+def slack_skill(text: str) -> str:
+    """Fetch recent action items from Slack and return a formatted reply."""
+    items = get_recent_action_items()
+
+    if not items:
+        return (
+            "📋 *Slack Skill*\n"
+            f"You asked: _{text}_\n\n"
+            "No action items found in your Slack channels.\n"
+            "I look for messages containing keywords like *todo*, *task*, "
+            "*action item*, *da fare*, or ✅."
+        )
+
+    lines = []
+    for item in items:
+        channel = item["channel"]
+        msg_text = item["text"]
+        # Truncate long messages for WhatsApp readability
+        if len(msg_text) > 200:
+            msg_text = msg_text[:197] + "..."
+        lines.append(f"• *#{channel}*: {msg_text}")
+
+    item_list = "\n".join(lines)
+    return (
+        "📋 *Slack Skill*\n"
+        f"You asked: _{text}_\n\n"
+        f"*Action items found ({len(items)}):*\n{item_list}"
     )
 
 
