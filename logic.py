@@ -1,19 +1,11 @@
-"""Message routing logic — inspects incoming text and dispatches to skill handlers."""
+"""Message routing logic — translated to Italian and French."""
 
 from calendar_integration import get_upcoming_events
 from slack_integration import get_recent_action_items
 
 
 def handle_message(text: str) -> str:
-    """Route an incoming message to the appropriate skill and return a reply.
-
-    Routing rules (checked in order):
-        • FAQ keywords  → faq_skill
-        • Calendar keywords → calendar_skill
-        • Slack keywords → slack_skill
-        • CRM keywords  → crm_skill
-        • Anything else → default reply
-    """
+    """Route an incoming message to the appropriate skill and return a reply."""
     normalised = text.strip().lower()
 
     if _matches_faq(normalised):
@@ -26,17 +18,17 @@ def handle_message(text: str) -> str:
         return crm_skill(text)
 
     return (
-        "Sorry, I didn't understand that. "
-        "Try asking about our FAQ, your calendar, Slack tasks, or CRM contacts."
+        "😐 Scusa, non ho capito. Prova a chiedermi del calendario, dei task su Slack o delle FAQ.\n\n"
+        "Désolé, je n'ai pas compris. Essayez de me poser des questions sur le calendrier, les tâches Slack ou la FAQ."
     )
 
 
-# ── keyword matchers ──────────────────────────────────────────────────────────────────────
+# ── keyword matchers ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-FAQ_KEYWORDS = {"faq", "help", "question", "support", "info", "hours", "pricing"}
-CALENDAR_KEYWORDS = {"calendar", "schedule", "meeting", "appointment", "event", "book"}
-SLACK_KEYWORDS = {"slack", "task", "todo", "messaggi"}
-CRM_KEYWORDS = {"crm", "contact", "lead", "customer", "deal", "pipeline", "account"}
+FAQ_KEYWORDS = {"faq", "aiuto", "aide", "info", "prezzi", "prix", "orari", "horaires"}
+CALENDAR_KEYWORDS = {"calendario", "calendrier", "agenda", "impegni", "rendez-vous", "appuntamento", "book", "prenota"}
+SLACK_KEYWORDS = {"slack", "task", "todo", "compiti", "tâches", "da fare", "messaggi"}
+CRM_KEYWORDS = {"crm", "contatto", "contact", "lead", "cliente", "client", "pipeline"}
 
 
 def _matches_faq(text: str) -> bool:
@@ -55,89 +47,55 @@ def _matches_crm(text: str) -> bool:
     return any(kw in text for kw in CRM_KEYWORDS)
 
 
-# ── skill placeholders ────────────────────────────────────────────────────────────────────
+# ── skill responses ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def faq_skill(text: str) -> str:
-    """Placeholder — look up an answer from the FAQ knowledge base."""
     return (
-        "📖 *FAQ Skill*\n"
-        f"You asked: _{text}_\n\n"
-        "Our business hours are Mon–Fri 9 AM – 6 PM UTC.\n"
-        "For detailed pricing visit https://example.com/pricing."
+        "📖 *FAQ SARE*\n\n"
+        "Orari: Lun–Ven 9:00 – 18:00 UTC.\n"
+        "Horaires: Lun–Ven 9h00 – 18h00 UTC.\n\n"
+        "Sito: https://example.com/pricing"
     )
 
 
 def calendar_skill(text: str) -> str:
-    """Fetch upcoming Google Calendar events and return a formatted reply."""
     events = get_upcoming_events()
-
     if not events:
         return (
-            "📅 *Calendar Skill*\n"
-            f"You asked: _{text}_\n\n"
-            "No upcoming events found for the rest of this week.\n"
-            "Reply with *book <title> <date> <time>* to schedule a new event."
+            "📅 *Calendario*\n\n"
+            "Nessun impegno trovato per il resto della settimana.\n"
+            "Aucun événement trouvé pour le reste de la semaine."
         )
 
     lines = []
     for ev in events:
-        start_raw = ev["start"]
-        try:
-            if "T" in start_raw:
-                dt = start_raw.replace("Z", "+00:00")
-                from datetime import datetime as _dt
-                parsed = _dt.fromisoformat(dt)
-                formatted = parsed.strftime("%a %b %d, %I:%M %p")
-            else:
-                formatted = start_raw
-        except (ValueError, TypeError):
-            formatted = start_raw
-        lines.append(f"• *{ev['title']}* — {formatted}")
+        lines.append(f"• *{ev['title']}* — {ev['start']}")
 
     event_list = "\n".join(lines)
-    return (
-        "📅 *Calendar Skill*\n"
-        f"You asked: _{text}_\n\n"
-        f"*Upcoming events this week:*\n{event_list}\n\n"
-        "Reply with *book <title> <date> <time>* to schedule a new event."
-    )
+    return f"📅 *I tuoi impegni:*\n\n{event_list}"
 
 
 def slack_skill(text: str) -> str:
-    """Fetch recent action items from Slack and return a formatted reply."""
     items = get_recent_action_items()
-
     if not items:
         return (
-            "📋 *Slack Skill*\n"
-            f"You asked: _{text}_\n\n"
-            "No action items found in your Slack channels.\n"
-            "I look for messages containing keywords like *todo*, *task*, "
-            "*action item*, *da fare*, or ✅."
+            "📋 *Slack Task*\n\n"
+            "Non ho trovato nuovi task o messaggi importanti su Slack.\n"
+            "Aucune tâche trouvée sur Slack."
         )
 
     lines = []
     for item in items:
-        channel = item["channel"]
-        msg_text = item["text"]
-        # Truncate long messages for WhatsApp readability
-        if len(msg_text) > 200:
-            msg_text = msg_text[:197] + "..."
-        lines.append(f"• *#{channel}*: {msg_text}")
+        msg = item['text'][:100] + "..." if len(item['text']) > 100 else item['text']
+        lines.append(f"• *#{item['channel']}*: {msg}")
 
     item_list = "\n".join(lines)
-    return (
-        "📋 *Slack Skill*\n"
-        f"You asked: _{text}_\n\n"
-        f"*Action items found ({len(items)}):*\n{item_list}"
-    )
+    return f"📋 *Task trovati su Slack:*\n\n{item_list}"
 
 
 def crm_skill(text: str) -> str:
-    """Placeholder — query or update CRM records."""
     return (
-        "👤 *CRM Skill*\n"
-        f"You asked: _{text}_\n\n"
-        "Found 3 open deals in your pipeline totalling $42,000.\n"
-        "Reply with *contact <name>* to look up a specific record."
+        "👤 *CRM SARE*\n\n"
+        "Hai 3 trattative aperte per un totale di $42.000.\n"
+        "Vous avez 3 opportunités ouvertes pour un total de 42 000 $."
     )
